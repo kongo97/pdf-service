@@ -1,0 +1,20 @@
+services:
+  pdf-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./app/src:/usr/src/app/src
+      - ./app/package.json:/usr/src/app/package.json
+      - ./app/tsconfig.json:/usr/src/app/tsconfig.json
+    restart: unless-stopped
+    command: npm run start:dev
+
+networks:
+  default:
+    name: pdf-service-dev-network
