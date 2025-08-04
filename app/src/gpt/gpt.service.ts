@@ -27,7 +27,7 @@ export interface GptAnalysisResult {
 
 @Injectable()
 export class GptService {
-  private readonly apiKey = process.env.OPENAI_API_KEY || 'sk-svcacct-yth6EAZsuH25o0R_h6DlCHfd98_SBb_vBphJ9KtQvTcd27EfseFK9fKdzPwp0wWAvT3BlbkFJCrEedTpyjRICqcPdd_T8QGBK7KBYzle2xQgCD9t3prxY6FdN5B1fVXq6o7CRsODAA';
+  private readonly apiKey = 'sk-svcacct-yth6EAZsuH25o0R_h6DlCHfd98_SBb_vBphJ9KtQvTcd27EfseFK9fKdzPwp0wWAvT3BlbkFJCrEedTpyjRICqcPdd_T8QGBK7KBYzle2xQgCD9t3prxY6FdN5B1fVXq6o7CRsODAA';
   private readonly apiUrl = 'https://api.openai.com/v1/chat/completions';
   private readonly filesUrl = 'https://api.openai.com/v1/files';
 
