@@ -46,6 +46,12 @@ export class LayoutService {
             </svg>
             Generate PDF
           </a>
+          <a href="/indicizza-pdf" class="flex items-center px-4 py-2 text-sm rounded-lg hover:bg-gray-700 transition-colors">
+            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            Indicizza PDF
+          </a>
           <a href="#" class="flex items-center px-4 py-2 text-sm rounded-lg hover:bg-gray-700 transition-colors">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -81,7 +87,7 @@ export class LayoutService {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>PDF Service</title>
-        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
       </head>
       <body class="bg-gray-100">
         ${navbar}
@@ -100,10 +106,12 @@ export class LayoutService {
         </div>
         <script>
           // Mobile menu toggle
-          document.getElementById('mobile-menu-button')?.addEventListener('click', function() {
-            // Add mobile menu logic here
-            console.log('Mobile menu clicked');
-          });
+          var mobileMenuButton = document.getElementById('mobile-menu-button');
+          if (mobileMenuButton) {
+            mobileMenuButton.addEventListener('click', function() {
+              console.log('Mobile menu clicked');
+            });
+          }
         </script>
       </body>
       </html>

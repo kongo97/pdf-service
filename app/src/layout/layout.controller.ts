@@ -1,10 +1,14 @@
 import { Controller, Get, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { LayoutService } from './layout.service';
+import { PdfIndexingService } from '../pdf-indexing/pdf-indexing.service';
 
 @Controller()
 export class LayoutController {
-  constructor(private readonly layoutService: LayoutService) {}
+  constructor(
+    private readonly layoutService: LayoutService,
+    private readonly pdfIndexingService: PdfIndexingService,
+  ) {}
 
   @Get()
   getLayout(@Res() res: Response) {
@@ -79,6 +83,36 @@ export class LayoutController {
     `;
     
     const html = this.layoutService.getMainLayout(dashboardContent);
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  }
+
+  @Get('indicizza-pdf')
+  getIndicizzaPdf(@Res() res: Response) {
+    const indicizzaContent = `
+      <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8">Indicizza PDF</h1>
+        
+        ${this.pdfIndexingService.getUploadComponent()}
+        
+        ${this.pdfIndexingService.getPageSelectorComponent()}
+        
+        ${this.pdfIndexingService.getRemainingPagesViewerComponent()}
+        
+        ${this.pdfIndexingService.getChapterViewerComponent()}
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          ${this.pdfIndexingService.getIndexingOptionsComponent()}
+          ${this.pdfIndexingService.getStatsComponent()}
+        </div>
+      </div>
+      
+      ${this.pdfIndexingService.getLoadingOverlayComponent()}
+      ${this.pdfIndexingService.getDisabledStateComponent()}
+      ${this.pdfIndexingService.getPdfViewerScript()}
+    `;
+    
+    const html = this.layoutService.getMainLayout(indicizzaContent);
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   }
