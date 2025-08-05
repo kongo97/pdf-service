@@ -1,13 +1,19 @@
+version: '3.8'
+
 services:
   pdf-service:
     build:
       context: .
       dockerfile: Dockerfile
+      target: development
     ports:
       - "3000:3000"
+    volumes:
+      - ./app:/usr/src/app
+      - /usr/src/app/node_modules
     environment:
-      - NODE_ENV=production
-    restart: unless-stopped
+      - NODE_ENV=development
+    command: npm run start:dev
 
 networks:
   default:
