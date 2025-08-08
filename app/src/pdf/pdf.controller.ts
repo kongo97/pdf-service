@@ -130,30 +130,79 @@ export class PdfController {
   }
 
   @Post('create-index')
+  @UseInterceptors(FileInterceptor('pdf'))
   async createIndex(
-    @Body() body: { entries: { title: string; source: string; pageNumber?: number }[] },
+    @UploadedFile() file: Express.Multer.File,
+    @Body('data') dataJson: string,
     @Res() res: Response,
   ) {
-    if (!body.entries || !Array.isArray(body.entries)) {
-      throw new BadRequestException('Entries array is required');
+    // Validate PDF file
+    if (!file) {
+      throw new BadRequestException('PDF file is required');
     }
 
-    if (body.entries.length === 0) {
+    if (file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Only PDF files are allowed');
+    }
+
+    // Parse and validate JSON data
+    let data: {
+      entries: { title: string; source: string; pageNumber: number }[];
+      from?: number;
+      to?: number;
+    };
+    
+    try {
+      data = JSON.parse(dataJson);
+    } catch (error) {
+      throw new BadRequestException('Invalid JSON format for data field');
+    }
+
+    // Validate entries
+    if (!data.entries || !Array.isArray(data.entries)) {
+      throw new BadRequestException('Entries array is required in data object');
+    }
+
+    if (data.entries.length === 0) {
       throw new BadRequestException('At least one entry is required');
     }
 
     // Validate entries structure
-    for (const entry of body.entries) {
+    for (const entry of data.entries) {
       if (!entry.title || !entry.source) {
         throw new BadRequestException('Each entry must have both title and source');
       }
+      if (typeof entry.pageNumber !== 'number' || entry.pageNumber < 1) {
+        throw new BadRequestException('Each entry must have a valid pageNumber (positive integer)');
+      }
+    }
+
+    // Validate page range parameters
+    const from = data.from;
+    const to = data.to;
+
+    if (from && (typeof from !== 'number' || from < 1)) {
+      throw new BadRequestException('From page must be a positive integer');
+    }
+
+    if (to && (typeof to !== 'number' || to < 1)) {
+      throw new BadRequestException('To page must be a positive integer');
+    }
+
+    if (from && to && from > to) {
+      throw new BadRequestException('From page cannot be greater than to page');
     }
 
     try {
-      const pdfBuffer = await this.pdfService.createIndexPdf(body.entries);
+      const pdfBuffer = await this.pdfService.createIndexWithPdf(
+        file.buffer,
+        data.entries,
+        from,
+        to
+      );
       
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename=indice_generato.pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=documento_con_indice.pdf');
       res.send(pdfBuffer);
     } catch (error) {
       throw new BadRequestException(`Error creating index PDF: ${error.message}`);
