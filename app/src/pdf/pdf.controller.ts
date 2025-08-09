@@ -16,7 +16,9 @@ export class PdfController {
   constructor(private readonly pdfService: PdfService) {}
 
   @Post('split')
-  @UseInterceptors(FileInterceptor('pdf'))
+  @UseInterceptors(FileInterceptor('pdf', {
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  }))
   async splitPdf(
     @UploadedFile() file: Express.Multer.File,
     @Res() res: Response,
@@ -41,7 +43,9 @@ export class PdfController {
   }
 
   @Post('split-all')
-  @UseInterceptors(FileInterceptor('pdf'))
+  @UseInterceptors(FileInterceptor('pdf', {
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  }))
   async splitPdfAllPages(
     @UploadedFile() file: Express.Multer.File,
   ): Promise<{ pages: string[]; count: number }> {
@@ -100,7 +104,9 @@ export class PdfController {
   }
 
   @Post('extract-text')
-  @UseInterceptors(FileInterceptor('pdf'))
+  @UseInterceptors(FileInterceptor('pdf', {
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  }))
   async extractText(
     @UploadedFile() file: Express.Multer.File,
   ): Promise<{ pages: { pageNumber: number; text: string }[]; pageCount: number }> {
@@ -130,7 +136,9 @@ export class PdfController {
   }
 
   @Post('create-index')
-  @UseInterceptors(FileInterceptor('pdf'))
+  @UseInterceptors(FileInterceptor('pdf', {
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  }))
   async createIndex(
     @UploadedFile() file: Express.Multer.File,
     @Body('data') dataJson: string,
@@ -210,7 +218,9 @@ export class PdfController {
   }
 
   @Post('number-pages')
-  @UseInterceptors(FileInterceptor('pdf'))
+  @UseInterceptors(FileInterceptor('pdf', {
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  }))
   async numberPages(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { skipPages?: string },
