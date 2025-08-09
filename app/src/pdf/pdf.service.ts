@@ -611,4 +611,78 @@ export class PdfService {
       throw new Error(`Failed to create index PDF with original content: ${error.message}`);
     }
   }
+
+  async numberPages(pdfBuffer: Buffer, skipPages: number = 4): Promise<Buffer> {
+    try {
+      this.logger.log(`Starting page numbering, skipping first ${skipPages} pages`);
+      
+      // Load the PDF document
+      const pdfDoc = await PDFDocument.load(pdfBuffer);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const pageCount = pdfDoc.getPageCount();
+      
+      // Settings
+      const rightMargin = 20;
+      const bottomOffset = 12;
+      const fontSize = 9;
+      
+      for (let i = 0; i < pageCount; i++) {
+        if (i < skipPages) {
+          continue; // Skip first pages
+        }
+        
+        const page = pdfDoc.getPage(i);
+        const { width, height } = page.getSize();
+        const displayedNumber = i - skipPages + 1; // Numbering starts from 1
+        
+        // Add new page number first
+        const pageNumberText = `P. ${displayedNumber}`;
+        const textWidth = font.widthOfTextAtSize(pageNumberText, fontSize);
+        const textHeight = fontSize;
+        
+        // Calculate exact position for new page number
+        const newNumberX = width - rightMargin - textWidth;
+        const newNumberY = bottomOffset;
+        
+        // Remove existing "P. <number>" text in the bottom right area
+        // Draw a white rectangle that covers only the area BELOW the bottom line
+        const cleanupRect = {
+          x: width - 120, // Wider cleanup area
+          y: 0,           // Start from very bottom
+          width: 120,
+          height: 18      // Small height to cover only the area below the line
+        };
+        
+        // Draw white rectangle to cover existing page numbers
+        page.drawRectangle({
+          x: cleanupRect.x,
+          y: cleanupRect.y,
+          width: cleanupRect.width,
+          height: cleanupRect.height,
+          color: rgb(1, 1, 1), // White color
+        });
+        
+        // Add new page number on top of the cleaned area
+        page.drawText(pageNumberText, {
+          x: newNumberX,
+          y: newNumberY,
+          size: fontSize,
+          font: font,
+          color: rgb(0, 0, 0), // Black color
+        });
+      }
+      
+      // Save the modified PDF
+      const pdfBytes = await pdfDoc.save({
+        useObjectStreams: false, // For better compression
+      });
+      
+      this.logger.log('Page numbering completed successfully');
+      return Buffer.from(pdfBytes);
+
+    } catch (error) {
+      this.logger.error(`Page numbering failed: ${error.message}`);
+      throw new Error(`Failed to number pages: ${error.message}`);
+    }
+  }
 }

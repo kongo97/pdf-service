@@ -208,4 +208,36 @@ export class PdfController {
       throw new BadRequestException(`Error creating index PDF: ${error.message}`);
     }
   }
+
+  @Post('number-pages')
+  @UseInterceptors(FileInterceptor('pdf'))
+  async numberPages(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { skipPages?: string },
+    @Res() res: Response,
+  ) {
+    if (!file) {
+      throw new BadRequestException('PDF file is required');
+    }
+
+    if (file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Only PDF files are allowed');
+    }
+
+    try {
+      const skipPages = body.skipPages ? parseInt(body.skipPages, 10) : 4;
+      
+      if (isNaN(skipPages) || skipPages < 0) {
+        throw new BadRequestException('skipPages must be a valid non-negative number');
+      }
+
+      const numberedPdf = await this.pdfService.numberPages(file.buffer, skipPages);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=documento_numerato.pdf');
+      res.send(numberedPdf);
+    } catch (error) {
+      throw new BadRequestException(`Error numbering PDF pages: ${error.message}`);
+    }
+  }
 }
