@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
       target: development
     ports:
-      - "3005:3000"
+      - "3005:3005"
     volumes:
       - ./app:/usr/src/app
       - /usr/src/app/node_modules
