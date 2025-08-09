@@ -226,11 +226,23 @@ export class PdfController {
     @Body() body: { skipPages?: string },
     @Res() res: Response,
   ) {
+    console.log('Number-pages endpoint called');
+    console.log('File received:', !!file);
+    console.log('Body:', body);
+    
     if (!file) {
+      console.log('ERROR: No file received');
       throw new BadRequestException('PDF file is required');
     }
 
+    console.log('File details:', { 
+      originalname: file.originalname, 
+      mimetype: file.mimetype, 
+      size: file.size 
+    });
+
     if (file.mimetype !== 'application/pdf') {
+      console.log('ERROR: Invalid file type:', file.mimetype);
       throw new BadRequestException('Only PDF files are allowed');
     }
 

@@ -5,6 +5,14 @@ import * as express from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: false });
 
+  // Logging middleware per debugging
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    console.log('Origin:', req.headers.origin);
+    console.log('Content-Type:', req.headers['content-type']);
+    next();
+  });
+
   // CORS preciso per il tuo FE
   app.enableCors({
     origin: ['http://liquify.link:4201'],
@@ -17,6 +25,7 @@ async function bootstrap() {
   // Gestione preflight (OPTIONS) il più presto possibile
   app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
+      console.log('Handling OPTIONS preflight request');
       res.status(204).end();
       return;
     }
@@ -27,6 +36,7 @@ async function bootstrap() {
   app.use(express.json({ limit: '0' }));
   app.use(express.urlencoded({ extended: true, limit: '0' }));
 
+  console.log('Server starting on http://0.0.0.0:3005');
   await app.listen(3005, '0.0.0.0');
 }
 bootstrap();
