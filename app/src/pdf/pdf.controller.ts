@@ -223,7 +223,11 @@ export class PdfController {
   }))
   async numberPages(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { skipPages?: string },
+    @Body() body: { 
+      skipPages?: string;
+      pages?: string;
+      old_pages?: string;
+    },
     @Res() res: Response,
   ) {
     const startTime = Date.now();
@@ -238,20 +242,36 @@ export class PdfController {
 
     try {
       const skipPages = body.skipPages ? parseInt(body.skipPages, 10) : 4;
+      const newBlankPages = body.pages ? parseInt(body.pages, 10) : 0;
+      const oldIndexPages = body.old_pages ? parseInt(body.old_pages, 10) : 0;
       
       if (isNaN(skipPages) || skipPages < 0) {
         throw new BadRequestException('skipPages must be a valid non-negative number');
+      }
+
+      if (isNaN(newBlankPages) || newBlankPages < 0) {
+        throw new BadRequestException('pages must be a valid non-negative number');
+      }
+
+      if (isNaN(oldIndexPages) || oldIndexPages < 0) {
+        throw new BadRequestException('old_pages must be a valid non-negative number');
       }
 
       // Set response headers early to improve perceived performance
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'attachment; filename=documento_numerato.pdf');
       
-      // Process the PDF with optimized service
-      const numberedPdf = await this.pdfService.numberPages(file.buffer, skipPages);
+      // Process the PDF with new parameters
+      const numberedPdf = await this.pdfService.numberPages(
+        file.buffer, 
+        skipPages, 
+        newBlankPages, 
+        oldIndexPages
+      );
       
       const processingTime = Date.now() - startTime;
       console.log(`PDF numbering completed in ${processingTime}ms for file: ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+      console.log(`Parameters: skipPages=${skipPages}, newBlankPages=${newBlankPages}, oldIndexPages=${oldIndexPages}`);
       
       res.send(numberedPdf);
     } catch (error) {

@@ -380,7 +380,7 @@ export class PdfService {
       }
       
       if (actualToPage < actualFromPage || actualToPage > originalPageCount) {
-        throw new Error(`To page ${actualToPage} is invalid (must be >= ${actualFromPage} and <= ${originalPageCount})`);
+        throw new Error(`To page ${actualToPage} is invalid (must be >= ${actualFromPage} and <= ${actualToPage})`);
       }
 
       // Create index PDF
@@ -389,15 +389,15 @@ export class PdfService {
       
       let currentPage = indexPdf.addPage([595.28, 841.89]); // A4 portrait
       const { width, height } = currentPage.getSize();
-      const marginTop = 45; // Reduced to fit more content
+      const marginTop = 45;
       const marginLeft = 50; 
       const marginRight = 50; 
-      const marginBottom = 30; // Reduced to fit more content
-      const lineHeight = 10; // Reduced line height for tighter spacing
-      const titleFontSize = 8.2;
-      const sourceFontSize = 6.8;
+      const marginBottom = 35;
+      const lineHeight = 14; // Increased for better readability
+      const titleFontSize = 8.5;
+      const sourceFontSize = 7.0;
       const headerFontSize = 16; 
-      const pageNumberFontSize = 8.2;
+      const pageNumberFontSize = 8.5;
       
       let y = height - marginTop;
       let indexPageNumber = 1;
@@ -413,22 +413,17 @@ export class PdfService {
         color: rgb(0, 0, 0),
       });
 
-      // Calculate how many pages the index should occupy (same as removed range)
-      const targetIndexPages = actualToPage - actualFromPage + 1;
+      // Fixed configuration: exactly 20 entries per page for optimal A4 utilization
+      const ENTRIES_PER_PAGE = 20;
       
-      // Divide entries evenly across all pages
-      const entriesPerPage = Math.ceil(entries.length / targetIndexPages);
+      // Calculate optimal spacing for 20 entries per page
+      const availableContentHeight = height - marginTop - marginBottom - 40; // Space minus header and page number
+      const totalSpaceForEntries = availableContentHeight - 30; // Reserve space after header
+      const spacePerEntry = totalSpaceForEntries / ENTRIES_PER_PAGE; // Dynamic spacing per entry
       
-      this.logger.log(`Index will occupy ${targetIndexPages} pages with ${entriesPerPage} entries per page (${entries.length} total entries)`);
+      this.logger.log(`Fixed distribution: exactly ${ENTRIES_PER_PAGE} entries per page with ${spacePerEntry.toFixed(1)}px per entry for optimal A4 usage`);
 
-      // Calculate vertical centering for first page
-      const entriesFirstPage = Math.min(entriesPerPage, entries.length);
-      const totalContentHeight = entriesFirstPage * (lineHeight * 3); // Estimated height per entry
-      const availableContentHeight = height - marginTop - marginBottom - 25 - 45; // Space minus header and page number
-      const extraSpace = Math.max(0, availableContentHeight - totalContentHeight);
-      const startY = height - marginTop - 25 - (extraSpace / 2); // Center vertically
-      
-      y = startY;
+      y -= 30; // Space after header
 
       // First pass: create all index content without links
       const linkData: Array<{
@@ -443,25 +438,13 @@ export class PdfService {
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
         
-        // Move to next page when we reach entriesPerPage (except on last page)
-        if (currentEntryOnPage >= entriesPerPage && indexPageNumber < targetIndexPages) {
+        // Check if we need a new page: exactly 20 entries per page or insufficient space
+        if (currentEntryOnPage >= ENTRIES_PER_PAGE || y < marginBottom + 60) {
           this.addPageNumber(currentPage, font, indexPageNumber, width, marginBottom);
           
           currentPage = indexPdf.addPage([595.28, 841.89]);
           indexPageNumber++;
-          
-          // Calculate entries for this page
-          const remainingEntries = entries.length - i;
-          const remainingPages = targetIndexPages - indexPageNumber + 1;
-          const entriesThisPage = Math.ceil(remainingEntries / remainingPages);
-          
-          // Calculate vertical centering for this page
-          const totalContentHeight = entriesThisPage * (lineHeight * 3); // Estimated height per entry
-          const availableContentHeight = height - marginTop - marginBottom - 25 - 45; // Space minus header and page number
-          const extraSpace = Math.max(0, availableContentHeight - totalContentHeight);
-          const startY = height - marginTop - 25 - (extraSpace / 2); // Center vertically
-          
-          y = startY;
+          y = height - marginTop - 30; // Reset position with header space
           currentEntryOnPage = 0;
         }
 
@@ -533,32 +516,39 @@ export class PdfService {
           }
         }
 
-        // Use consistent spacing between entries
+        // Use dynamic spacing that maximizes page usage for exactly 20 entries
         currentEntryOnPage++;
-        y -= lineHeight * 1.5; // Fixed spacing between entries
-      }
-
-      // Fill remaining pages if we have fewer entries than target pages
-      while (indexPageNumber < targetIndexPages) {
-        this.addPageNumber(currentPage, font, indexPageNumber, width, marginBottom);
-        currentPage = indexPdf.addPage([595.28, 841.89]);
-        indexPageNumber++;
+        
+        // Calculate dynamic spacing based on remaining space and entries
+        const remainingEntriesOnPage = ENTRIES_PER_PAGE - currentEntryOnPage;
+        const remainingSpaceOnPage = y - marginBottom - 40; // Reserve space for page number
+        
+        if (remainingEntriesOnPage > 0 && remainingSpaceOnPage > 0) {
+          // Distribute remaining space evenly among remaining entries
+          const dynamicSpacing = Math.min(lineHeight * 2.2, remainingSpaceOnPage / remainingEntriesOnPage * 0.7);
+          y -= dynamicSpacing;
+        } else {
+          // Default spacing if calculation fails
+          y -= lineHeight * 1.8;
+        }
       }
 
       // Add page number to the last index page
       this.addPageNumber(currentPage, font, indexPageNumber, width, marginBottom);
 
       // Now add all the links with correct page calculations
-      // The pageNumber in entries refers to content pages, but we need to add (from-1) for cover pages
       for (const linkInfo of linkData) {
-        const displayPageNumber = linkInfo.entry.pageNumber; // Page number shown in index (correct as is)
-        const targetPageInFinalPdf = displayPageNumber + (actualFromPage - 1); // Add cover pages offset for link destination
+        const displayPageNumber = linkInfo.entry.pageNumber; // Page number shown in index
+        // Calculate target page in final PDF: original page + offset from removed pages
+        const pagesRemovedBeforeTarget = Math.max(0, actualToPage - actualFromPage + 1); // Pages that will be removed
+        const indexPagesAdded = indexPdf.getPageCount(); // Pages that will be added
+        const targetPageInFinalPdf = displayPageNumber - pagesRemovedBeforeTarget + indexPagesAdded + (actualFromPage - 1);
         
         const linkAnnotation = indexPdf.context.obj({
           Type: 'Annot',
           Subtype: 'Link',
           Rect: [linkInfo.rect.x, linkInfo.rect.y - 2, linkInfo.rect.x + linkInfo.rect.width, linkInfo.rect.y + linkInfo.rect.height],
-          Dest: [targetPageInFinalPdf - 1, 'XYZ', null, null, null], // 0-indexed for destination
+          Dest: [Math.max(0, targetPageInFinalPdf - 1), 'XYZ', null, null, null], // 0-indexed for destination
           Border: [0, 0, 0], // No border
         });
         const linkRef = indexPdf.context.register(linkAnnotation);
@@ -567,6 +557,7 @@ export class PdfService {
 
       // Create final PDF by removing the specified range and inserting the index
       const finalPdf = await PDFDocument.create();
+      const actualIndexPages = indexPdf.getPageCount(); // Use actual number of index pages generated
       
       // 1. Copy pages BEFORE the from-to range from original PDF
       if (actualFromPage > 1) {
@@ -580,10 +571,10 @@ export class PdfService {
       }
       
       // 2. Insert the new index pages (replacing the removed range)
-      const indexPageIndices = Array.from({ length: indexPdf.getPageCount() }, (_, i) => i);
+      const indexPageIndices = Array.from({ length: actualIndexPages }, (_, i) => i);
       const copiedIndexPages = await finalPdf.copyPages(indexPdf, indexPageIndices);
       copiedIndexPages.forEach(page => finalPdf.addPage(page));
-      this.logger.log(`Added ${indexPageIndices.length} index pages to replace range ${actualFromPage}-${actualToPage}`);
+      this.logger.log(`Added ${actualIndexPages} index pages to replace range ${actualFromPage}-${actualToPage}`);
       
       // 3. Copy pages AFTER the from-to range from original PDF
       if (actualToPage < originalPageCount) {
@@ -599,10 +590,10 @@ export class PdfService {
       const finalPageCount = finalPdf.getPageCount();
       const beforePages = actualFromPage > 1 ? actualFromPage - 1 : 0;
       const afterPages = actualToPage < originalPageCount ? originalPageCount - actualToPage : 0;
-      const indexPages = targetIndexPages; // Always equals the removed pages
       const removedPages = actualToPage - actualFromPage + 1;
       
-      this.logger.log(`Final PDF created with ${finalPageCount} pages: ${beforePages} before + ${indexPages} index (exactly replacing ${removedPages} removed pages) + ${afterPages} after`);
+      this.logger.log(`Final PDF created with ${finalPageCount} pages: ${beforePages} before + ${actualIndexPages} index (replacing ${removedPages} removed pages) + ${afterPages} after`);
+      this.logger.log(`Index optimally distributed across ${actualIndexPages} pages for maximum page utilization`);
 
       const pdfBytes = await finalPdf.save();
       return Buffer.from(pdfBytes);
@@ -612,14 +603,55 @@ export class PdfService {
     }
   }
 
-  async numberPages(pdfBuffer: Buffer, skipPages: number = 4): Promise<Buffer> {
+  async numberPages(
+    pdfBuffer: Buffer, 
+    skipPages: number = 4, 
+    newBlankPages: number = 0, 
+    oldIndexPages: number = 0
+  ): Promise<Buffer> {
     try {
-      this.logger.log(`Starting page numbering, skipping first ${skipPages} pages`);
+      this.logger.log(`Starting page numbering with parameters: skipPages=${skipPages}, newBlankPages=${newBlankPages}, oldIndexPages=${oldIndexPages}`);
       
-      // Load the PDF document
-      const pdfDoc = await PDFDocument.load(pdfBuffer);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const pageCount = pdfDoc.getPageCount();
+      // Load the original PDF document
+      const originalPdfDoc = await PDFDocument.load(pdfBuffer);
+      const originalPageCount = originalPdfDoc.getPageCount();
+      
+      this.logger.log(`Original PDF has ${originalPageCount} pages`);
+      
+      // Create a new PDF document for the result
+      const newPdfDoc = await PDFDocument.create();
+      
+      // Step 1: Copy the first skipPages (cover pages, etc.)
+      if (skipPages > 0) {
+        const coverPageIndices = Array.from({ length: Math.min(skipPages, originalPageCount) }, (_, i) => i);
+        const copiedCoverPages = await newPdfDoc.copyPages(originalPdfDoc, coverPageIndices);
+        copiedCoverPages.forEach(page => newPdfDoc.addPage(page));
+        this.logger.log(`Added ${coverPageIndices.length} cover pages`);
+      }
+      
+      // Step 2: Add new blank pages
+      if (newBlankPages > 0) {
+        for (let i = 0; i < newBlankPages; i++) {
+          newPdfDoc.addPage([595.28, 841.89]); // A4 portrait blank page
+        }
+        this.logger.log(`Added ${newBlankPages} blank pages`);
+      }
+      
+      // Step 3: Skip old index pages and copy remaining content
+      const startCopyFrom = skipPages + oldIndexPages;
+      if (startCopyFrom < originalPageCount) {
+        const contentPageIndices = Array.from(
+          { length: originalPageCount - startCopyFrom }, 
+          (_, i) => startCopyFrom + i
+        );
+        const copiedContentPages = await newPdfDoc.copyPages(originalPdfDoc, contentPageIndices);
+        copiedContentPages.forEach(page => newPdfDoc.addPage(page));
+        this.logger.log(`Added ${contentPageIndices.length} content pages (skipping ${oldIndexPages} old index pages)`);
+      }
+      
+      // Step 4: Apply page numbering starting from the blank pages
+      const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
+      const newPageCount = newPdfDoc.getPageCount();
       
       // Pre-calculate common values to avoid repeated calculations
       const rightMargin = 20;
@@ -634,17 +666,19 @@ export class PdfService {
         height: 18
       };
       
-      // Process pages in batches to reduce I/O overhead
-      const batchSize = Math.min(10, Math.max(1, Math.floor((pageCount - skipPages) / 5)));
+      // Start numbering from skipPages (including blank pages)
+      const startNumberingFrom = skipPages;
+      const totalPagesToNumber = newPageCount - skipPages;
+      const batchSize = Math.min(10, Math.max(1, Math.floor(totalPagesToNumber / 5)));
       
-      for (let batchStart = skipPages; batchStart < pageCount; batchStart += batchSize) {
-        const batchEnd = Math.min(batchStart + batchSize, pageCount);
+      for (let batchStart = startNumberingFrom; batchStart < newPageCount; batchStart += batchSize) {
+        const batchEnd = Math.min(batchStart + batchSize, newPageCount);
         
         // Process batch of pages
         for (let i = batchStart; i < batchEnd; i++) {
-          const page = pdfDoc.getPage(i);
+          const page = newPdfDoc.getPage(i);
           const { width } = page.getSize(); // Only get width, height not needed
-          const displayedNumber = i - skipPages + 1;
+          const displayedNumber = i - skipPages + 1; // Start numbering from 1 at the first blank page
           
           // Pre-calculate text and positioning
           const pageNumberText = `P. ${displayedNumber}`;
@@ -672,20 +706,20 @@ export class PdfService {
         }
         
         // Log progress for long documents
-        if (pageCount > 50) {
-          this.logger.log(`Processed pages ${batchStart + 1}-${batchEnd} of ${pageCount}`);
+        if (newPageCount > 50) {
+          this.logger.log(`Processed pages ${batchStart + 1}-${batchEnd} of ${newPageCount}`);
         }
       }
       
       // Optimize save settings for faster processing
-      const pdfBytes = await pdfDoc.save({
+      const pdfBytes = await newPdfDoc.save({
         useObjectStreams: false,  // Faster for smaller files
         addDefaultPage: false,    // Don't add default page
         objectsPerTick: 50,       // Process more objects per tick
         updateFieldAppearances: false, // Skip field appearance updates
       });
       
-      this.logger.log(`Page numbering completed successfully for ${pageCount - skipPages} pages`);
+      this.logger.log(`Page numbering completed successfully. Final PDF: ${newPageCount} pages (${totalPagesToNumber} numbered pages starting from blank pages)`);
       return Buffer.from(pdfBytes);
 
     } catch (error) {
