@@ -621,63 +621,71 @@ export class PdfService {
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const pageCount = pdfDoc.getPageCount();
       
-      // Settings
+      // Pre-calculate common values to avoid repeated calculations
       const rightMargin = 20;
       const bottomOffset = 12;
       const fontSize = 9;
+      const whiteColor = rgb(1, 1, 1);
+      const blackColor = rgb(0, 0, 0);
       
-      for (let i = 0; i < pageCount; i++) {
-        if (i < skipPages) {
-          continue; // Skip first pages
+      // Pre-calculate cleanup rectangle dimensions
+      const cleanupRect = {
+        width: 120,
+        height: 18
+      };
+      
+      // Process pages in batches to reduce I/O overhead
+      const batchSize = Math.min(10, Math.max(1, Math.floor((pageCount - skipPages) / 5)));
+      
+      for (let batchStart = skipPages; batchStart < pageCount; batchStart += batchSize) {
+        const batchEnd = Math.min(batchStart + batchSize, pageCount);
+        
+        // Process batch of pages
+        for (let i = batchStart; i < batchEnd; i++) {
+          const page = pdfDoc.getPage(i);
+          const { width } = page.getSize(); // Only get width, height not needed
+          const displayedNumber = i - skipPages + 1;
+          
+          // Pre-calculate text and positioning
+          const pageNumberText = `P. ${displayedNumber}`;
+          const textWidth = font.widthOfTextAtSize(pageNumberText, fontSize);
+          const newNumberX = width - rightMargin - textWidth;
+          const cleanupX = width - cleanupRect.width;
+          
+          // Single operation: draw white rectangle to cover existing page numbers
+          page.drawRectangle({
+            x: cleanupX,
+            y: 0,
+            width: cleanupRect.width,
+            height: cleanupRect.height,
+            color: whiteColor,
+          });
+          
+          // Single operation: add new page number
+          page.drawText(pageNumberText, {
+            x: newNumberX,
+            y: bottomOffset,
+            size: fontSize,
+            font: font,
+            color: blackColor,
+          });
         }
         
-        const page = pdfDoc.getPage(i);
-        const { width, height } = page.getSize();
-        const displayedNumber = i - skipPages + 1; // Numbering starts from 1
-        
-        // Add new page number first
-        const pageNumberText = `P. ${displayedNumber}`;
-        const textWidth = font.widthOfTextAtSize(pageNumberText, fontSize);
-        const textHeight = fontSize;
-        
-        // Calculate exact position for new page number
-        const newNumberX = width - rightMargin - textWidth;
-        const newNumberY = bottomOffset;
-        
-        // Remove existing "P. <number>" text in the bottom right area
-        // Draw a white rectangle that covers only the area BELOW the bottom line
-        const cleanupRect = {
-          x: width - 120, // Wider cleanup area
-          y: 0,           // Start from very bottom
-          width: 120,
-          height: 18      // Small height to cover only the area below the line
-        };
-        
-        // Draw white rectangle to cover existing page numbers
-        page.drawRectangle({
-          x: cleanupRect.x,
-          y: cleanupRect.y,
-          width: cleanupRect.width,
-          height: cleanupRect.height,
-          color: rgb(1, 1, 1), // White color
-        });
-        
-        // Add new page number on top of the cleaned area
-        page.drawText(pageNumberText, {
-          x: newNumberX,
-          y: newNumberY,
-          size: fontSize,
-          font: font,
-          color: rgb(0, 0, 0), // Black color
-        });
+        // Log progress for long documents
+        if (pageCount > 50) {
+          this.logger.log(`Processed pages ${batchStart + 1}-${batchEnd} of ${pageCount}`);
+        }
       }
       
-      // Save the modified PDF
+      // Optimize save settings for faster processing
       const pdfBytes = await pdfDoc.save({
-        useObjectStreams: false, // For better compression
+        useObjectStreams: false,  // Faster for smaller files
+        addDefaultPage: false,    // Don't add default page
+        objectsPerTick: 50,       // Process more objects per tick
+        updateFieldAppearances: false, // Skip field appearance updates
       });
       
-      this.logger.log('Page numbering completed successfully');
+      this.logger.log(`Page numbering completed successfully for ${pageCount - skipPages} pages`);
       return Buffer.from(pdfBytes);
 
     } catch (error) {

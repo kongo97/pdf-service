@@ -226,23 +226,13 @@ export class PdfController {
     @Body() body: { skipPages?: string },
     @Res() res: Response,
   ) {
-    console.log('Number-pages endpoint called');
-    console.log('File received:', !!file);
-    console.log('Body:', body);
+    const startTime = Date.now();
     
     if (!file) {
-      console.log('ERROR: No file received');
       throw new BadRequestException('PDF file is required');
     }
 
-    console.log('File details:', { 
-      originalname: file.originalname, 
-      mimetype: file.mimetype, 
-      size: file.size 
-    });
-
     if (file.mimetype !== 'application/pdf') {
-      console.log('ERROR: Invalid file type:', file.mimetype);
       throw new BadRequestException('Only PDF files are allowed');
     }
 
@@ -253,12 +243,20 @@ export class PdfController {
         throw new BadRequestException('skipPages must be a valid non-negative number');
       }
 
-      const numberedPdf = await this.pdfService.numberPages(file.buffer, skipPages);
-      
+      // Set response headers early to improve perceived performance
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'attachment; filename=documento_numerato.pdf');
+      
+      // Process the PDF with optimized service
+      const numberedPdf = await this.pdfService.numberPages(file.buffer, skipPages);
+      
+      const processingTime = Date.now() - startTime;
+      console.log(`PDF numbering completed in ${processingTime}ms for file: ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+      
       res.send(numberedPdf);
     } catch (error) {
+      const processingTime = Date.now() - startTime;
+      console.error(`PDF numbering failed after ${processingTime}ms: ${error.message}`);
       throw new BadRequestException(`Error numbering PDF pages: ${error.message}`);
     }
   }
